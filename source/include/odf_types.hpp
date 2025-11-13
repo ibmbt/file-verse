@@ -140,6 +140,7 @@ struct UserInfo {
  * Used for directory listings and file metadata
  */
 struct FileEntry {
+    uint8_t valid;              // 1 for valid/in-use, 0 for invalid/deleted
     char name[256];             // File/directory name (null-terminated)
     uint8_t type;               // 0=file, 1=directory (EntryType)
     uint64_t size;              // Size in bytes (0 for directories)
@@ -147,17 +148,25 @@ struct FileEntry {
     uint64_t created_time;      // Creation timestamp (Unix epoch)
     uint64_t modified_time;     // Last modification timestamp (Unix epoch)
     char owner[32];             // Username of owner
-    uint32_t inode;             // Internal file identifier
-    uint8_t reserved[47];       // Reserved for future use
+    uint32_t inode;             // Internal file identifier (start block for files)
+    uint32_t parent_index;      // Entry index of parent directory (1 for root's children)
+    uint8_t reserved[42];       // Reserved for future use (47 - 4 - 1 = 42)
 
     // Default constructor
-    FileEntry() = default;
+    FileEntry() : valid(0), type(0), size(0), permissions(0), created_time(0), 
+                  modified_time(0), inode(0), parent_index(0) {
+        std::memset(name, 0, sizeof(name));
+        std::memset(owner, 0, sizeof(owner));
+        std::memset(reserved, 0, sizeof(reserved));
+    }
     
     // Constructor
     FileEntry(const std::string& filename, EntryType entry_type, uint64_t file_size, 
-              uint32_t perms, const std::string& file_owner, uint32_t file_inode)
-        : type(static_cast<uint8_t>(entry_type)), size(file_size), permissions(perms), 
-          created_time(0), modified_time(0), inode(file_inode) {
+              uint32_t perms, const std::string& file_owner, uint32_t file_inode,
+              uint32_t parent_idx)
+        : valid(1), type(static_cast<uint8_t>(entry_type)), size(file_size), 
+          permissions(perms), created_time(0), modified_time(0), 
+          inode(file_inode), parent_index(parent_idx) {
         std::strncpy(name, filename.c_str(), sizeof(name) - 1);
         name[sizeof(name) - 1] = '\0';
         std::strncpy(owner, file_owner.c_str(), sizeof(owner) - 1);
@@ -170,6 +179,15 @@ struct FileEntry {
     
     // Setter for type as enum
     void setType(EntryType entry_type) { type = static_cast<uint8_t>(entry_type); }
+    
+    // Check if entry is valid
+    bool isValid() const { return valid == 1; }
+    
+    // Mark entry as valid
+    void markValid() { valid = 1; }
+    
+    // Mark entry as invalid/deleted
+    void markInvalid() { valid = 0; }
 };  // Total: 416 bytes
 
 /**
