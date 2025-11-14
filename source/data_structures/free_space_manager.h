@@ -73,11 +73,9 @@ private:
     }
 
 public:
-    // FIXED: Reserve block 0, start from block 1
     FreeSpaceManager(uint32_t numBlocks)
         : totalBlocks(numBlocks), freeBlocks(numBlocks - 1) {
-        // CRITICAL FIX: Start free space from block 1 (not 0)
-        // Block 0 is RESERVED
+
         if (numBlocks > 1) {
             freeSegments.push_back(FreeSegment(1, numBlocks - 1));
         }
@@ -104,8 +102,15 @@ public:
         FreeSegment& segment = freeSegments[segmentIndex];
 
         for (uint32_t i = 0; i < count; i++) {
-            allocatedBlocks.push_back(segment.startBlock + i);
+        uint32_t blockNum = segment.startBlock + i;
+        if (blockNum == 0) {
+            if (!allocatedBlocks.empty()) {
+                freeBlockSegments(allocatedBlocks);
+            }
+            return vector<uint32_t>(); 
         }
+        allocatedBlocks.push_back(blockNum);
+    }
 
         if (segment.blockCount == count) {
             freeSegments.erase(freeSegments.begin() + segmentIndex);
@@ -169,7 +174,6 @@ public:
     }
 
     bool isFree(uint32_t blockIndex) const {
-        // Block 0 is never free (reserved)
         if (blockIndex == 0) return false;
         
         for (size_t i = 0; i < freeSegments.size(); i++) {
@@ -183,7 +187,6 @@ public:
     }
 
     bool isUsed(uint32_t blockIndex) const {
-        // Block 0 is always used (reserved)
         if (blockIndex == 0) return true;
         return !isFree(blockIndex);
     }
@@ -197,7 +200,6 @@ public:
     }
 
     uint32_t getUsedBlocks() const {
-        // Account for reserved block 0
         return totalBlocks - freeBlocks;
     }
 
